@@ -5,8 +5,25 @@ const logtimestamp = require("log-timestamp");
 const player = require("play-sound")((opts = {}));
 const open = require("open");
 
-// aggregate scraped data into an array of js objects
-const scrapedData = [];
+// read in command line args
+let myArgs = process.argv;
+let hasArgs = false;
+if (myArgs.length > 2) {
+  myArgs = myArgs.slice(2);
+  hasArgs = true;
+}
+console.log('myArgs: ', myArgs);
+
+let duration = 5;
+let contact = null;
+if (hasArgs) {
+  duration = myArgs[0];
+  if (myArgs.length > 1) {
+    contact = myArgs[1];
+  }
+}
+const DURATION = duration;
+const CONTACT = contact;
 
 // add colors for console.log downstairs 👨‍🎨
 const COLORS = { red: "\x1b[31m", green: "\x1b[32m" };
@@ -16,6 +33,9 @@ const fetchData = async (url) => {
   const result = await axios.get(url);
   return cheerio.load(result.data);
 };
+
+// aggregate scraped data into an array of js objects
+const scrapedData = [];
 
 // fetch data and add to scrapedData array
 const fetchDataFn = async (consoleString) => {
@@ -78,25 +98,21 @@ const checkForStockAndAlert = (data, i) => {
       setTimeout(function () {
         console.log("Going to restart");
         schedule();
-      }, 1000 * 60 * 5);
+      }, 1000 * 60 * DURATION);
     })
     .catch((err) => console.error("error in scheduler", err));
 })();
 
-const checkRetailers = async () => {
+const checkRetailers = async (url) => {
   let found_one = false;
-  
-  // const $ = await fetchData(`https://www.bestbuy.com/site/combo/xbox-series-x-and-s-consoles/751d7e18-e554-4d61-9773-d9795e492b81`);
   
   const browser = await puppeteer.launch({
     // headless: false
   });
 
   const page = await browser.newPage();
-  await page.goto('https://www.target.com/p/xbox-series-x-console/-/A-80790841');
-  // await page.goto('https://www.target.com/p/xbox-series-s-console/-/A-80790842');
-  // await page.goto('https://www.target.com/p/elden-ring-playstation-4/-/A-77401224');
-  
+  await page.goto(url);
+
   let found__next = true;
   try {
     await page.waitForSelector('div#__next');
@@ -131,7 +147,8 @@ const checkRetailers = async () => {
 
   const importantText = dataValues.join(" ");
   if (importantText.includes("There was a temporary issue")) {
-    console.log("Temporary issue, retry in 5 min??")
+    console.log("Temporary issue, retry in 5 min??");
+    // call another async method to rerun this method with same url after sleeping for DURATION
   }
   if (importantText.includes("Out of stock")) {
     found_one = false;
@@ -147,6 +164,12 @@ const checkRetailers = async () => {
   return found_one;
 }
 
-checkRetailers();
+checkRetailers('https://www.target.com/p/xbox-series-x-console/-/A-80790841');
+// 'https://www.target.com/p/xbox-series-x-console/-/A-80790841'    // series x
+// 'https://www.target.com/p/xbox-series-s-console/-/A-80790842'    // series s
+// 'https://www.target.com/p/elden-ring-playstation-4/-/A-77401224' // elden ring
+// `https://www.bestbuy.com/site/combo/xbox-series-x-and-s-consoles/751d7e18-e554-4d61-9773-d9795e492b81`
 
-//  future additions - command line argument to specify duration and email address, small email/text service to alert if stock is found, twilio
+
+
+//  future additions - small email/text service to alert if stock is found, twilio
