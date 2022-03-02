@@ -1,5 +1,6 @@
 const axios = require("axios");
 const cheerio = require("cheerio");
+const puppeteer = require('puppeteer');
 const logtimestamp = require("log-timestamp");
 const player = require("play-sound")((opts = {}));
 const open = require("open");
@@ -8,7 +9,7 @@ const open = require("open");
 const scrapedData = [];
 
 // add colors for console.log downstairs 👨‍🎨
-const colors = { red: "\x1b[31m", green: "\x1b[32m" };
+const COLORS = { red: "\x1b[31m", green: "\x1b[32m" };
 
 // fetch data for given url
 const fetchData = async (url) => {
@@ -46,13 +47,13 @@ const checkForStockAndAlert = (data, i) => {
   };
 
   const currentConsole = consoleData[i];
-
+//  console.log(data);
   const potentials = data.filter(
     (v) => v.status !== "Out of Stock" && v.status !== "Not Tracking" && !v.name.startsWith("Ebay") // ain't nobody got time for Ebay
   );
 
   if (potentials.length > 0) {
-    console.log(colors.green, `${currentConsole.name} LOCATED`);
+    console.log(COLORS.green, `${currentConsole.name} LOCATED`);
 
     // open link of each potential console in default browser
     potentials.forEach((potential) => open(potential.link));
@@ -61,7 +62,7 @@ const checkForStockAndAlert = (data, i) => {
       if (err) throw err;
     });
   } else {
-    console.log(colors.red, `No ${currentConsole.name} located! :(`);
+    console.log(COLORS.red, `No ${currentConsole.name} located! :(`);
   }
 };
 
@@ -82,4 +83,70 @@ const checkForStockAndAlert = (data, i) => {
     .catch((err) => console.error("error in scheduler", err));
 })();
 
-//  future additions - call retailer APIs directly, use puppeteer, command line argument to specify duration, twilio
+const checkRetailers = async () => {
+  let found_one = false;
+  
+  // const $ = await fetchData(`https://www.bestbuy.com/site/combo/xbox-series-x-and-s-consoles/751d7e18-e554-4d61-9773-d9795e492b81`);
+  
+  const browser = await puppeteer.launch({
+    // headless: false
+  });
+
+  const page = await browser.newPage();
+  await page.goto('https://www.target.com/p/xbox-series-x-console/-/A-80790841');
+  // await page.goto('https://www.target.com/p/xbox-series-s-console/-/A-80790842');
+  // await page.goto('https://www.target.com/p/elden-ring-playstation-4/-/A-77401224');
+  
+  let found__next = true;
+  try {
+    await page.waitForSelector('div#__next');
+  } catch (error) {
+    console.error("Error: " + error + " , div#__next not found.");
+    found__next = false;
+  }
+
+  const dataTestValues = await page.$$eval(
+    'div',
+    divs => divs.map(div => div.dataset.test)
+  );
+  
+  const filteredDataTestValues = dataTestValues.filter(x => x);
+
+  if (!found__next) {
+    if (filteredDataTestValues.includes("storeBlockOrderPickup")) {
+      console.log("Found pickup order!");
+      found_one = true;
+    } else if (filteredDataTestValues.includes("outOfStockNearbyMessage") || 
+               filteredDataTestValues.includes("outOfStockMessage")) {
+      found_one = false;
+      console.log("Out of stock");
+    }
+  }
+
+  const dataValues = await page.$$eval(
+    'div.h-text-bold',
+    divs => divs.map(div => div.innerHTML)
+  );
+  console.log(dataValues)
+
+  const importantText = dataValues.join(" ");
+  if (importantText.includes("There was a temporary issue")) {
+    console.log("Temporary issue, retry in 5 min??")
+  }
+  if (importantText.includes("Out of stock")) {
+    found_one = false;
+    console.log("Out of stock");
+  } else if (importantText.includes("Available near you")) {
+    found_one = true;
+    console.log("Available near you!");
+  }
+  
+  await browser.close();
+  console.log("done");
+
+  return found_one;
+}
+
+checkRetailers();
+
+//  future additions - command line argument to specify duration and email address, small email/text service to alert if stock is found, twilio
