@@ -149,6 +149,7 @@ const checkRetailers = async (url) => {
   if (importantText.includes("There was a temporary issue")) {
     console.log("Temporary issue, retry in 5 min??");
     // call another async method to rerun this method with same url after sleeping for DURATION
+    // or maybe not, it could just be issue on target side, check back in morning
   }
   if (importantText.includes("Out of stock")) {
     found_one = false;
@@ -170,6 +171,6 @@ checkRetailers('https://www.target.com/p/xbox-series-x-console/-/A-80790841');
 // 'https://www.target.com/p/elden-ring-playstation-4/-/A-77401224' // elden ring
 // `https://www.bestbuy.com/site/combo/xbox-series-x-and-s-consoles/751d7e18-e554-4d61-9773-d9795e492b81`
 
+// https://www.eurogamer.net/articles/xbox-series-x-s-stock-where-to-buy
 
-
-//  future additions - small email/text service to alert if stock is found, twilio
+//  future additions - small email/text service to alert if stock is found, twilio, possibly condense old cold to use puppeteer?
